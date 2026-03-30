@@ -15,6 +15,29 @@ const matches = ref<Match[]>([]);
 const isLoading = ref(true);
 const searchQuery = ref("");
 const statusMsg = ref("");
+const isEquipeOpen = ref(false);
+
+// Répertoire prioritaire des chaînes
+const equipeChannels = ref<Match[]>([
+  {
+    id: 'chaine-lequipe-21',
+    titre: "L'Équipe 21",
+    url: '',
+    info: "Répertoire L'Équipe"
+  },
+  {
+    id: 'chaine-live-foot-1',
+    titre: "L'Équipe Live Foot 1",
+    url: '',
+    info: "Répertoire L'Équipe"
+  },
+  {
+    id: 'chaine-live-foot-2',
+    titre: "L'Équipe Live Foot 2",
+    url: '',
+    info: "Répertoire L'Équipe"
+  }
+]);
 
 // State pour le lecteur
 const isStreaming = ref(false);
@@ -37,11 +60,32 @@ const loadMatches = async () => {
   }
 };
 
+const EQUIPE_PAGE_URL = "https://empire-sport.art/chaine/l-equipe-en-streaming"; // À vérifier selon le site
+
 const startStreaming = async (match: Match) => {
-  statusMsg.value = `⏳ Préparation du flux pour ${match.titre}... (7 étapes en cours)`;
+  // 1. Déterminer s'il s'agit d'une chaîne TV ou d'un match direct
+  const isTvChannel = match.info === "Répertoire L'Équipe";
+  
+  // Si c'est un match normal et qu'il n'y a pas d'URL, on arrête
+  if (!isTvChannel && !match.url) {
+    statusMsg.value = `📺 ${match.titre} n'a pas encore de flux disponible.`;
+    return;
+  }
+
+  statusMsg.value = `⏳ Préparation du flux pour ${match.titre}...`;
   
   try {
-    const res = await fetch(`http://localhost:8000/api/get-stream-url?url=${encodeURIComponent(match.url)}`);
+    let apiUrl = "";
+    
+    if (isTvChannel) {
+      // Pour la TV, on passe l'URL de la page équipe + le NOM de la chaîne à chercher
+      apiUrl = `http://localhost:8000/api/get-tv-url?url=${encodeURIComponent(EQUIPE_PAGE_URL)}&channel_name=${encodeURIComponent(match.titre)}`;
+    } else {
+      // Pour les matchs classiques
+      apiUrl = `http://localhost:8000/api/get-stream-url?url=${encodeURIComponent(match.url)}`;
+    }
+
+    const res = await fetch(apiUrl);
     const data = await res.json();
 
     if (data.m3u8) {
@@ -50,17 +94,25 @@ const startStreaming = async (match: Match) => {
       isStreaming.value = true;
       statusMsg.value = "";
     } else {
-      statusMsg.value = "❌ Impossible de récupérer le flux direct.";
+      statusMsg.value = `❌ Flux introuvable pour ${match.titre}.`;
     }
   } catch (e) {
-    statusMsg.value = "❌ Erreur de connexion au scraper.";
+    statusMsg.value = "❌ Erreur de connexion au serveur Python.";
   }
 };
 
 // --- FILTRAGE ---
+const normalizedQuery = computed(() => searchQuery.value.toLowerCase());
+
+const filteredEquipeChannels = computed(() => {
+  return equipeChannels.value.filter(m => 
+    m.titre.toLowerCase().includes(normalizedQuery.value)
+  );
+});
+
 const filteredMatches = computed(() => {
   return matches.value.filter(m => 
-    m.titre.toLowerCase().includes(searchQuery.value.toLowerCase())
+    m.titre.toLowerCase().includes(normalizedQuery.value)
   );
 });
 
@@ -94,7 +146,7 @@ onMounted(loadMatches);
         </div>
 
         <div class="flex items-center gap-4 w-full lg:w-auto">
-          <div class="relative flex-grow lg:w-96">
+          <div class="relative grow lg:w-96">
             <span class="absolute left-4 top-1/2 -translate-y-1/2 text-slate-500">🔎</span>
             <input 
               v-model="searchQuery"
@@ -114,6 +166,51 @@ onMounted(loadMatches);
       </div>
 
       <main>
+        <section class="mb-10 max-w-md rounded-3xl border border-white/10 bg-slate-900/70 p-3 sm:p-4 shadow-2xl">
+          <button
+            @click="isEquipeOpen = !isEquipeOpen"
+            class="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-slate-800 via-slate-900 to-black p-4 text-left sm:p-5"
+          >
+            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black to-transparent"></div>
+
+            <div class="relative z-10 flex min-h-40 flex-col justify-between">
+              <div class="flex justify-center pt-1">
+                <img
+                  src="/lequipe-logo.svg"
+                  alt="Logo L'Equipe"
+                  class="h-14 w-auto rounded-sm border border-slate-300/20 bg-white px-4 py-1 shadow-[0_10px_26px_rgba(0,0,0,0.45)]"
+                />
+              </div>
+
+              <div class="flex items-end gap-3 text-white">
+                <div class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/30 bg-black/30">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6.6a9 9 0 0 1 8 0M6 9.8a13 13 0 0 1 12 0M4 13a17 17 0 0 1 16 0M12 20h.01"/>
+                  </svg>
+                </div>
+                <div>
+                  <p class="text-xl font-black leading-none">L'equipe</p>
+                  <p class="text-base font-semibold leading-tight text-slate-200">{{ filteredEquipeChannels.length }} chaines</p>
+                </div>
+                <div class="ml-auto text-sm font-bold text-slate-200">
+                  {{ isEquipeOpen ? 'Masquer' : 'Ouvrir' }}
+                </div>
+              </div>
+            </div>
+          </button>
+
+          <div v-if="isEquipeOpen" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <button
+              v-for="channel in filteredEquipeChannels"
+              :key="channel.id"
+              @click="startStreaming(channel)"
+              class="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-left text-sm font-bold text-slate-100 transition-colors hover:border-red-400/70 hover:bg-slate-900"
+            >
+              {{ channel.titre }}
+            </button>
+          </div>
+        </section>
+
         <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
           <div v-for="i in 8" :key="i" class="h-64 bg-slate-900/50 rounded-[2.5rem] animate-pulse border border-slate-800"></div>
         </div>
@@ -139,16 +236,16 @@ onMounted(loadMatches);
             </div>
 
             <button @click="startStreaming(match)" 
-                    class="relative z-10 w-full py-5 bg-slate-100 text-slate-950 font-black rounded-[1.5rem] hover:bg-orange-500 hover:text-white transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 shadow-xl">
+                  class="relative z-10 w-full py-5 bg-slate-100 text-slate-950 font-black rounded-3xl hover:bg-orange-500 hover:text-white transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 shadow-xl">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                 <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
               </svg>
-              VOIR LE MATCH
+              {{ match.url ? 'VOIR LE MATCH' : 'BIENTOT DISPONIBLE' }}
             </button>
           </div>
         </div>
 
-        <div v-if="!isLoading && filteredMatches.length === 0" class="text-center py-40 border-2 border-dashed border-slate-900 rounded-[3rem]">
+        <div v-if="!isLoading && filteredMatches.length === 0 && filteredEquipeChannels.length === 0" class="text-center py-40 border-2 border-dashed border-slate-900 rounded-[3rem]">
           <p class="text-slate-700 text-3xl font-black italic uppercase tracking-tighter opacity-50">Aucun match trouvé</p>
         </div>
       </main>

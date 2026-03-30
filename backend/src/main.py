@@ -35,7 +35,7 @@ def get_headless_driver():
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
     
     # debug
-    options.add_argument("--headless") 
+    # options.add_argument("--headless") 
 
     options.add_argument("--mute-audio") # mute le son
     
@@ -151,6 +151,88 @@ def get_stream_url(url: str = Query(...)):
         return {"m3u8": lien_m3u8}
     
     return {"error": "Lien non trouvé après les 7 étapes."}
+
+@app.get("/api/get-tv-url")
+def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
+    print(f"📺 Scraping TV lancé pour : {channel_name}")
+    driver = get_headless_driver()
+    lien_m3u8 = None
+
+    try:
+        driver.get(url)
+        time.sleep(3) 
+
+        # 1. Sélection de la chaîne
+        try:
+            channels = driver.find_elements(By.CSS_SELECTOR, ".card-tv")
+            target_channel = None
+            for ch in channels:
+                if channel_name.lower() in ch.text.lower():
+                    target_channel = ch
+                    break
+            
+            if target_channel:
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", target_channel)
+                time.sleep(1)
+                driver.execute_script("arguments[0].click();", target_channel)
+                print(f"✅ Chaîne {channel_name} sélectionnée. Attente chargement page flux...")
+                time.sleep(5) # Crucial : laisser la page de la chaîne charger
+            else:
+                print(f"❌ Chaîne {channel_name} non trouvée.")
+                return {"error": "Chaîne introuvable"}
+        except Exception as e:
+            print(f"⚠️ Erreur sélection chaîne : {e}")
+
+        # 2. Les 7 étapes de pubs (Ta logique habituelle adaptée)
+        for i in range(1, 8):
+            try:
+                # On attend le bouton de pub
+                wait = WebDriverWait(driver, 15)
+                bouton = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btn-pub.fr")))
+                
+                # Clic forcé
+                driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", bouton)
+                time.sleep(1)
+                driver.execute_script("arguments[0].click();", bouton)
+                print(f"⚡ [ÉTAPE {i}/7] Clic réussi.")
+
+                # Nettoyage rapide des popups (2s)
+                time.sleep(2)
+                if len(driver.window_handles) > 1:
+                    main_handle = driver.window_handles[0]
+                    for handle in driver.window_handles[1:]:
+                        driver.switch_to.window(handle)
+                        driver.close()
+                    driver.switch_to.window(main_handle)
+                
+                time.sleep(6) # Validation Empire
+            except Exception as e:
+                print(f"❌ Arrêt à l'étape {i} ou bouton non trouvé.")
+                break
+
+        # 3. Récupération du flux m3u8
+        print("🔎 Analyse des logs pour trouver le m3u8...")
+        time.sleep(4) # Laisser le temps au lecteur de lancer le flux
+        logs = driver.get_log('performance')
+        
+        for entry in logs:
+            msg = json.loads(entry['message'])['message']
+            if msg['method'] == 'Network.requestWillBeSent':
+                url_req = msg['params']['request']['url']
+                # Filtre pour chopper le bon lien
+                if (".m3u8" in url_req or "playlist" in url_req) and "chunk" not in url_req:
+                    if "googlesyndication" not in url_req:
+                        lien_m3u8 = url_req
+                        print(f"🎯 Flux TV trouvé : {url_req[:60]}...")
+                        break
+
+    except Exception as global_e:
+        print(f"💥 Erreur globale : {global_e}")
+    finally:
+        driver.quit()
+        print("🔌 Navigateur fermé.")
+    
+    return {"m3u8": lien_m3u8} if lien_m3u8 else {"error": "Lien TV non trouvé"}
 
 if __name__ == "__main__":
     uvicorn.run(app, host="0.0.0.0", port=8000)
