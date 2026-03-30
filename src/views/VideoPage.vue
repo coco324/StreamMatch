@@ -34,6 +34,9 @@ onMounted(() => {
           maxMaxBufferLength: 120, // Peut monter jusqu'à 2 min de cache
           enableLowInitialPlaylist: true, // Charge plus vite au début
           limitRenditionByPlayerDimensions: false, // Garde la meilleure qualité possible
+          smoothQualityChange: true,
+          fastQualityChange: true,
+          useNetworkInformationApi: false,
         }
       },
       sources: [{
@@ -69,7 +72,7 @@ onBeforeUnmount(() => {
     <div class="flex-grow flex items-center justify-center bg-black">
       <div class="w-full max-w-6xl shadow-2xl shadow-orange-900/20">
         <div data-vjs-player>
-          <video ref="videoPlayer" class="video-js vjs-theme-city vjs-big-play-centered"></video>
+          <video ref="videoPlayer" class="video-js vjs-theme-city [image-rendering:auto] shadow-[0_0_50px_rgba(0,0,0,0.5)]"></video>
         </div>
       </div>
     </div>

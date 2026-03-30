@@ -34,8 +34,10 @@ def get_headless_driver():
     # --- LOGGING POUR LE M3U8 ---
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
     
-    # CONSEIL : Laisse la ligne suivante commentée pour VOIR si ça bloque encore
-    # options.add_argument("--headless") 
+    # debug
+    options.add_argument("--headless") 
+
+    options.add_argument("--mute-audio") # mute le son
     
     driver = uc.Chrome(options=options, version_main=146)
     
@@ -86,14 +88,14 @@ def get_stream_url(url: str = Query(...)):
                 EC.element_to_be_clickable((By.CSS_SELECTOR, ".overlay-play"))
             )
             driver.execute_script("arguments[0].click();", overlay)
-            time.sleep(5)
+            time.sleep(3)
         except: pass
 
         # 2. Automatisation des 7 étapes
         for i in range(1, 8):
             try:
                 print(f"⏳ [ÉTAPE {i}/7] Recherche du bouton...")
-                wait = WebDriverWait(driver, 5)
+                wait = WebDriverWait(driver, 1)
                 bouton = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btn-pub.fr")))
                 
                 # Scroll et clic forcé
@@ -102,8 +104,8 @@ def get_stream_url(url: str = Query(...)):
                 driver.execute_script("arguments[0].click();", bouton)
                 print(f"⚡ [ÉTAPE {i}/7] Clic effectué. Nettoyage des pubs...")
 
-                # --- NETTOYAGE EXPRESS (Max 2 secondes) ---
-                time.sleep(2) # On laisse juste le temps à la popup de "naître"
+                # --- NETTOYAGE EXPRESS (Max 1 secondes) ---
+                time.sleep(1) # On laisse juste le temps à la popup de "naître"
                 if len(driver.window_handles) > 1:
                     main_handle = driver.window_handles[0]
                     # On boucle sur toutes les fenêtres sauf la première
@@ -117,7 +119,7 @@ def get_stream_url(url: str = Query(...)):
                 # Attente de la validation Empire (le compteur doit tourner)
                 # On attend le reste du temps ici (6s car on a déjà attendu 2s)
                 print(f"⏳ Attente validation étape {i}...")
-                time.sleep(2) 
+                time.sleep(1) 
 
             except Exception as e:
                 print(f"❌ Erreur à l'étape {i}")

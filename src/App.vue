@@ -88,9 +88,8 @@ onMounted(loadMatches);
           </div>
           <div>
             <h1 class="text-4xl font-black tracking-tighter uppercase italic leading-none">
-              Empire <span class="text-orange-500 underline decoration-orange-500/30 underline-offset-8">Hub</span>
+              Stream <span class="text-orange-500 underline decoration-orange-500/30 underline-offset-8">Match</span>
             </h1>
-            <p class="text-slate-500 text-xs font-bold tracking-[0.3em] mt-3 uppercase opacity-70">Privé & Familial</p>
           </div>
         </div>
 
