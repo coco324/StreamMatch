@@ -245,4 +245,4 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
     return {"m3u8": lien_m3u8} if lien_m3u8 else {"error": "Lien TV non trouvé"}
 
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000)
+    uvicorn.run(app, host="0.0.0.0", port=8300)

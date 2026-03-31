@@ -85,6 +85,7 @@ const ligue1Channels = ref<Match[]>([
 ]);
 
 // State pour le lecteur
+const url = ref("http://localhost:8300");
 const isStreaming = ref(false);
 const selectedMatch = ref<Match | null>(null);
 const currentStreamUrl = ref("");
@@ -95,7 +96,7 @@ const loadMatches = async () => {
   isLoading.value = true;
   statusMsg.value = "";
   try {
-    const res = await fetch('http://localhost:8000/api/matches');
+    const res = await fetch(`${url.value}/api/matches`);
     if (!res.ok) throw new Error();
     matches.value = await res.json();
   } catch (e) {
@@ -149,10 +150,10 @@ const startStreaming = async (match: Match) => {
     
     if (isTvChannel) {
       // Pour la TV, on passe l'URL de la page équipe + le NOM de la chaîne à chercher
-      apiUrl = `http://localhost:8000/api/get-tv-url?url=${encodeURIComponent(url)}&channel_name=${encodeURIComponent(match.titre)}`;
+      apiUrl = `${url}/api/get-tv-url?url=${encodeURIComponent(url)}&channel_name=${encodeURIComponent(match.titre)}`;
     } else {
       // Pour les matchs classiques
-      apiUrl = `http://localhost:8000/api/get-stream-url?url=${encodeURIComponent(match.url)}`;
+      apiUrl = `${url}/api/get-stream-url?url=${encodeURIComponent(match.url)}`;
     }
 
     const res = await fetch(apiUrl);
