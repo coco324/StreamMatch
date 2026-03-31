@@ -34,8 +34,8 @@ def get_headless_driver():
     # --- LOGGING POUR LE M3U8 ---
     options.set_capability('goog:loggingPrefs', {'performance': 'ALL'})
     
-    # debug
-    # options.add_argument("--headless") 
+    # debug (cache les fenêtres)
+    options.add_argument("--headless") 
 
     options.add_argument("--mute-audio") # mute le son
     
@@ -88,21 +88,21 @@ def get_stream_url(url: str = Query(...)):
                 EC.element_to_be_clickable((By.CSS_SELECTOR, ".overlay-play"))
             )
             driver.execute_script("arguments[0].click();", overlay)
-            time.sleep(3)
+            time.sleep(1)
         except: pass
 
-        # 2. Automatisation des 7 étapes
-        for i in range(1, 8):
+        # 2. Automatisation des 6 étapes
+        for i in range(1, 7):
             try:
-                print(f"⏳ [ÉTAPE {i}/7] Recherche du bouton...")
+                print(f"⏳ [ÉTAPE {i}/6] Recherche du bouton...")
                 wait = WebDriverWait(driver, 1)
                 bouton = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btn-pub.fr")))
                 
                 # Scroll et clic forcé
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", bouton)
-                time.sleep(1) 
+                # time.sleep(1) 
                 driver.execute_script("arguments[0].click();", bouton)
-                print(f"⚡ [ÉTAPE {i}/7] Clic effectué. Nettoyage des pubs...")
+                print(f"⚡ [ÉTAPE {i}/6] Clic effectué. Nettoyage des pubs...")
 
                 # --- NETTOYAGE EXPRESS (Max 1 secondes) ---
                 time.sleep(1) # On laisse juste le temps à la popup de "naître"
@@ -119,7 +119,7 @@ def get_stream_url(url: str = Query(...)):
                 # Attente de la validation Empire (le compteur doit tourner)
                 # On attend le reste du temps ici (6s car on a déjà attendu 2s)
                 print(f"⏳ Attente validation étape {i}...")
-                time.sleep(1) 
+                # time.sleep(1) 
 
             except Exception as e:
                 print(f"❌ Erreur à l'étape {i}")
@@ -128,6 +128,7 @@ def get_stream_url(url: str = Query(...)):
         # 3. Récupération du lien m3u8 dans les logs
         print("🔎 [DEBUG] Analyse des logs réseau...")
         logs = driver.get_log('performance')
+        time.sleep(2) # Laisser le temps au lecteur de lancer le flux
         
         for entry in logs:
             msg = json.loads(entry['message'])['message']
@@ -160,9 +161,18 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
 
     try:
         driver.get(url)
-        time.sleep(3) 
+
+        #pour forcer le navigateur a croir que la page est toujours visible (et éviter les blocages de pub)
+        driver.execute_cdp_cmd("Page.addScriptToEvaluateOnNewDocument", {
+        "source": """
+        Object.defineProperty(document, 'visibilityState', {get: () => 'visible'});
+        Object.defineProperty(document, 'hidden', {get: () => false});
+        window.addEventListener('visibilitychange', (e) => e.stopImmediatePropagation(), true);
+        """
+        })
 
         # 1. Sélection de la chaîne
+       
         try:
             channels = driver.find_elements(By.CSS_SELECTOR, ".card-tv")
             target_channel = None
@@ -176,15 +186,15 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
                 time.sleep(1)
                 driver.execute_script("arguments[0].click();", target_channel)
                 print(f"✅ Chaîne {channel_name} sélectionnée. Attente chargement page flux...")
-                time.sleep(5) # Crucial : laisser la page de la chaîne charger
+                time.sleep(1) # Crucial : laisser la page de la chaîne charger
             else:
                 print(f"❌ Chaîne {channel_name} non trouvée.")
                 return {"error": "Chaîne introuvable"}
         except Exception as e:
             print(f"⚠️ Erreur sélection chaîne : {e}")
 
-        # 2. Les 7 étapes de pubs (Ta logique habituelle adaptée)
-        for i in range(1, 8):
+        # 2. Les 6 étapes de pubs 
+        for i in range(1, 7):
             try:
                 # On attend le bouton de pub
                 wait = WebDriverWait(driver, 15)
@@ -192,12 +202,12 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
                 
                 # Clic forcé
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", bouton)
-                time.sleep(1)
+                # time.sleep(1)
                 driver.execute_script("arguments[0].click();", bouton)
-                print(f"⚡ [ÉTAPE {i}/7] Clic réussi.")
+                print(f"⚡ [ÉTAPE {i}/6] Clic réussi.")
 
-                # Nettoyage rapide des popups (2s)
-                time.sleep(2)
+                # Nettoyage rapide des popups (1s)
+                time.sleep(1)
                 if len(driver.window_handles) > 1:
                     main_handle = driver.window_handles[0]
                     for handle in driver.window_handles[1:]:
@@ -205,14 +215,14 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
                         driver.close()
                     driver.switch_to.window(main_handle)
                 
-                time.sleep(6) # Validation Empire
+                # time.sleep(1) # Validation Empire
             except Exception as e:
                 print(f"❌ Arrêt à l'étape {i} ou bouton non trouvé.")
                 break
 
         # 3. Récupération du flux m3u8
         print("🔎 Analyse des logs pour trouver le m3u8...")
-        time.sleep(4) # Laisser le temps au lecteur de lancer le flux
+        time.sleep(2) # Laisser le temps au lecteur de lancer le flux
         logs = driver.get_log('performance')
         
         for entry in logs:
