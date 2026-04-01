@@ -7,8 +7,21 @@ from fastapi.middleware.cors import CORSMiddleware
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-
+import os
+from dotenv import load_dotenv
 app = FastAPI()
+
+# === Chargement de l'environnement (dev par défaut) ===
+if os.getenv("ENV") == "production":
+    load_dotenv(".env.prod")
+    print("🚀 Mode PRODUCTION chargé → .env.prod")
+else:
+    load_dotenv(".env.dev")
+    print("🔧 Mode DEVELOPMENT chargé par défaut → .env.dev")
+
+SERVER_URL = os.getenv("SERVER_URL")
+
+print(f"ENVIRONNEMENT : {os.getenv('ENV', 'development')}")
 
 # --- CONFIGURATION CORS (INDISPENSABLE) ---
 app.add_middleware(
@@ -91,10 +104,10 @@ def get_stream_url(url: str = Query(...)):
             time.sleep(1)
         except: pass
 
-        # 2. Automatisation des 6 étapes
-        for i in range(1, 7):
+        # 2. Automatisation des 7 étapes
+        for i in range(1, 8):
             try:
-                print(f"⏳ [ÉTAPE {i}/6] Recherche du bouton...")
+                print(f"⏳ [ÉTAPE {i}/7] Recherche du bouton...")
                 wait = WebDriverWait(driver, 1)
                 bouton = wait.until(EC.presence_of_element_located((By.CSS_SELECTOR, ".btn-pub.fr")))
                 
@@ -102,7 +115,7 @@ def get_stream_url(url: str = Query(...)):
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", bouton)
                 # time.sleep(1) 
                 driver.execute_script("arguments[0].click();", bouton)
-                print(f"⚡ [ÉTAPE {i}/6] Clic effectué. Nettoyage des pubs...")
+                print(f"⚡ [ÉTAPE {i}/7] Clic effectué. Nettoyage des pubs...")
 
                 # --- NETTOYAGE EXPRESS (Max 1 secondes) ---
                 time.sleep(1) # On laisse juste le temps à la popup de "naître"
@@ -193,8 +206,8 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
         except Exception as e:
             print(f"⚠️ Erreur sélection chaîne : {e}")
 
-        # 2. Les 6 étapes de pubs 
-        for i in range(1, 7):
+        # 2. Les 7 étapes de pubs 
+        for i in range(1, 8):
             try:
                 # On attend le bouton de pub
                 wait = WebDriverWait(driver, 15)
@@ -204,7 +217,7 @@ def get_tv_url(url: str = Query(...), channel_name: str = Query(...)):
                 driver.execute_script("arguments[0].scrollIntoView({block: 'center'});", bouton)
                 # time.sleep(1)
                 driver.execute_script("arguments[0].click();", bouton)
-                print(f"⚡ [ÉTAPE {i}/6] Clic réussi.")
+                print(f"⚡ [ÉTAPE {i}/7] Clic réussi.")
 
                 # Nettoyage rapide des popups (1s)
                 time.sleep(1)
