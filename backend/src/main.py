@@ -7,21 +7,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-import os
-from dotenv import load_dotenv
+
 app = FastAPI()
-
-# === Chargement de l'environnement (dev par défaut) ===
-if os.getenv("ENV") == "production":
-    load_dotenv(".env.prod")
-    print("🚀 Mode PRODUCTION chargé → .env.prod")
-else:
-    load_dotenv(".env.dev")
-    print("🔧 Mode DEVELOPMENT chargé par défaut → .env.dev")
-
-SERVER_URL = os.getenv("SERVER_URL")
-
-print(f"ENVIRONNEMENT : {os.getenv('ENV', 'development')}")
 
 # --- CONFIGURATION CORS (INDISPENSABLE) ---
 app.add_middleware(

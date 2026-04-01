@@ -86,6 +86,7 @@ const ligue1Channels = ref<Match[]>([
 
 // State pour le lecteur
 const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8300';
+console.log("Backend URL:", backendUrl);
 const isStreaming = ref(false);
 const selectedMatch = ref<Match | null>(null);
 const currentStreamUrl = ref("");
