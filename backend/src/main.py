@@ -50,6 +50,10 @@ def get_headless_driver():
     return driver
 
 # --- ROUTES ---
+@app.get("/api/hello")
+def hello():
+    return {"message": "Hello from FastAPI!"}
+
 
 @app.get("/api/matches")
 def list_matches():
