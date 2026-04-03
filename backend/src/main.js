@@ -6,6 +6,7 @@ import * as cheerio from 'cheerio';
 
 const app = express();
 const PORT = process.env.PORT || 8302;
+const IP = '185.31.41.79';
 
 app.use(cors());
 
@@ -196,6 +197,6 @@ app.get('/api/test', (req, res) => {
 
 app.use('/backend', backendRouter);
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+app.listen(PORT, IP, () => {
+    console.log(`🚀 Serveur Node lancé sur ${IP}:${PORT}`);
 });
