@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import VideoPage from './views/VideoPage.vue';
 
 // --- INTERFACES ---
@@ -10,89 +10,53 @@ interface Match {
   info: string;
 }
 
-// --- STATES ---
+// --- CONFIGURATION ---
+const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8300';
+
+// URLs des pages "Répertoires" d'Empire
+const EQUIPE_PAGE_URL = "https://empire-sport.art/chaine/l-equipe-en-streaming"; 
+const BEIN_PAGE_URL = "https://empire-sport.art/chaine/bein-sports-en-streaming"; 
+const LIGUE1_PAGE_URL = "https://empire-sport.art/chaine/ligue1-en-streaming";
+
+// --- ÉTATS (STATES) ---
 const matches = ref<Match[]>([]);
 const isLoading = ref(false);
 const searchQuery = ref("");
 const statusMsg = ref("");
+
+// Visibilité des catégories
 const isEquipeOpen = ref(false);
 const isBeinOpen = ref(false);
 const isLigue1Open = ref(false);
 const isEventsVisible = ref(false);
 
-// Répertoire prioritaire des chaînes
-const equipeChannels = ref<Match[]>([
-  {
-    id: 'chaine-lequipe-21',
-    titre: "L'Équipe 21",
-    url: '',
-    info: "Répertoire L'Équipe"
-  },
-  {
-    id: 'chaine-live-foot-1',
-    titre: "L'Équipe Live Foot 1",
-    url: '',
-    info: "Répertoire L'Équipe"
-  },
-  {
-    id: 'chaine-live-foot-2',
-    titre: "L'Équipe Live Foot 2",
-    url: '',
-    info: "Répertoire L'Équipe"
-  }
-]);
-
-const beinChannels = ref<Match[]>([
-  {
-    id: 'chaine-bein-sport-1',
-    titre: "Bein Sports 1",
-    url: '',
-    info: "Répertoire beIN"
-  },
-  {
-    id: 'chaine-bein-sport-2',
-    titre: "Bein Sports 2",
-    url: '',
-    info: "Répertoire beIN"
-  },
-  {
-    id: 'chaine-bein-sport-3',
-    titre: "Bein Sports 3",
-    url: '',
-    info: "Répertoire beIN"
-  }
-]);
-
-const ligue1Channels = ref<Match[]>([
-  {
-    id: 'chaine-ligue1-plus-1',
-    titre: "Ligue 1+",
-    url: '',
-    info: "Répertoire Ligue 1+"
-  },
-  {
-    id: 'chaine-ligue1-plus-2',
-    titre: "Ligue 1+ 2",
-    url: '',
-    info: "Répertoire Ligue 1+"
-  },
-  {
-    id: 'chaine-ligue1-plus-3',
-    titre: "Ligue 1+ 3",
-    url: '',
-    info: "Répertoire Ligue 1+"
-  }
-]);
-
-// State pour le lecteur
-const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8300';
-console.log("Backend URL:", backendUrl);
+// État du lecteur vidéo
 const isStreaming = ref(false);
 const selectedMatch = ref<Match | null>(null);
 const currentStreamUrl = ref("");
 
+// --- DONNÉES STATIQUES (CHAÎNES TV) ---
+const equipeChannels = ref<Match[]>([
+  { id: 'ch-lequipe-21', titre: "L'Équipe 21", url: EQUIPE_PAGE_URL, info: "Répertoire L'Équipe" },
+  { id: 'ch-live-foot-1', titre: "L'Équipe Live Foot 1", url: EQUIPE_PAGE_URL, info: "Répertoire L'Équipe" },
+  { id: 'ch-live-foot-2', titre: "L'Équipe Live Foot 2", url: EQUIPE_PAGE_URL, info: "Répertoire L'Équipe" }
+]);
+
+const beinChannels = ref<Match[]>([
+  { id: 'ch-bein-1', titre: "Bein Sports 1", url: BEIN_PAGE_URL, info: "Répertoire beIN" },
+  { id: 'ch-bein-2', titre: "Bein Sports 2", url: BEIN_PAGE_URL, info: "Répertoire beIN" },
+  { id: 'ch-bein-3', titre: "Bein Sports 3", url: BEIN_PAGE_URL, info: "Répertoire beIN" }
+]);
+
+const ligue1Channels = ref<Match[]>([
+  { id: 'ch-l1-1', titre: "Ligue 1+", url: LIGUE1_PAGE_URL, info: "Répertoire Ligue 1+" },
+  { id: 'ch-l1-2', titre: "Ligue 1+ 2", url: LIGUE1_PAGE_URL, info: "Répertoire Ligue 1+" },
+  { id: 'ch-l1-3', titre: "Ligue 1+ 3", url: LIGUE1_PAGE_URL, info: "Répertoire Ligue 1+" }
+]);
+
 // --- LOGIQUE API ---
 
+// Charger les matchs en direct depuis le scraper Node.js
 const loadMatches = async () => {
   isLoading.value = true;
   statusMsg.value = "";
@@ -101,63 +65,38 @@ const loadMatches = async () => {
     if (!res.ok) throw new Error();
     matches.value = await res.json();
   } catch (e) {
-    statusMsg.value = "🔌 Erreur : Le serveur Python est hors ligne.";
+    statusMsg.value = "🔌 Erreur : Le serveur Node.js est hors ligne.";
   } finally {
     isLoading.value = false;
   }
 };
 
 const toggleEvents = async () => {
-  if (isEventsVisible.value) {
-    isEventsVisible.value = false;
-    return;
-  }
-
-  isEventsVisible.value = true;
-  if (matches.value.length === 0) {
+  isEventsVisible.value = !isEventsVisible.value;
+  if (isEventsVisible.value && matches.value.length === 0) {
     await loadMatches();
   }
 };
 
-const EQUIPE_PAGE_URL = "https://empire-sport.art/chaine/l-equipe-en-streaming"; 
-const BEIN_PAGE_URL = "https://empire-sport.art/chaine/bein-sports-en-streaming"; 
-const LIGUE1_PAGE_URL = "https://empire-sport.art/chaine/ligue1-en-streaming";
-
+// Lancer le flux (Appel au bypass WebSocket du backend)
 const startStreaming = async (match: Match) => {
-  // 1. Déterminer s'il s'agit d'une chaîne TV ou d'un match direct
-  const isTvChannel =
-    match.info === "Répertoire L'Équipe" ||
-    match.info === "Répertoire beIN" ||
-    match.info === "Répertoire Ligue 1+";
-
-  const sourceUrl = isTvChannel
-    ? match.info === "Répertoire L'Équipe"
-      ? EQUIPE_PAGE_URL
-      : match.info === "Répertoire beIN"
-        ? BEIN_PAGE_URL
-        : LIGUE1_PAGE_URL
-    : match.url;
-  
-  // Si c'est un match normal et qu'il n'y a pas d'URL, on arrête
-  if (!isTvChannel && !match.url) {
-    statusMsg.value = `📺 ${match.titre} n'a pas encore de flux disponible.`;
+  if (!match.url) {
+    statusMsg.value = `📺 Flux non disponible pour ${match.titre}.`;
     return;
   }
 
-  statusMsg.value = `⏳ Préparation du flux pour ${match.titre}...`;
+  statusMsg.value = `⏳ Bypass des protections en cours pour ${match.titre}...`;
   
   try {
-    let apiUrl = "";
+    const isTvChannel = match.info.includes("Répertoire");
     
+    // Construction de la requête pour Node.js
+    const params = new URLSearchParams({ url: match.url });
     if (isTvChannel) {
-      // Pour la TV, on passe l'URL de la page équipe + le NOM de la chaîne à chercher
-      apiUrl = `${backendUrl}/api/get-tv-url?url=${encodeURIComponent(sourceUrl)}&channel_name=${encodeURIComponent(match.titre)}`;
-    } else {
-      // Pour les matchs classiques
-      apiUrl = `${backendUrl}/api/get-stream-url?url=${encodeURIComponent(match.url)}`;
+        params.append('channel_name', match.titre);
     }
 
-    const res = await fetch(apiUrl);
+    const res = await fetch(`${backendUrl}/api/get-stream-url?${params.toString()}`);
     const data = await res.json();
 
     if (data.m3u8) {
@@ -166,39 +105,21 @@ const startStreaming = async (match: Match) => {
       isStreaming.value = true;
       statusMsg.value = "";
     } else {
-      statusMsg.value = `❌ Flux introuvable pour ${match.titre}.`;
+      statusMsg.value = `❌ Impossible de générer le flux pour ${match.titre}.`;
     }
   } catch (e) {
-    statusMsg.value = "❌ Erreur de connexion au serveur Python.";
+    statusMsg.value = "❌ Erreur de communication avec le backend.";
   }
 };
 
 // --- FILTRAGE ---
 const normalizedQuery = computed(() => searchQuery.value.toLowerCase());
+const filterFn = (m: Match) => m.titre.toLowerCase().includes(normalizedQuery.value);
 
-const filteredEquipeChannels = computed(() => {
-  return equipeChannels.value.filter(m => 
-    m.titre.toLowerCase().includes(normalizedQuery.value)
-  );
-});
-
-const filteredBeinChannels = computed(() => {
-  return beinChannels.value.filter(m => 
-    m.titre.toLowerCase().includes(normalizedQuery.value)
-  );
-});
-
-const filteredLigue1Channels = computed(() => {
-  return ligue1Channels.value.filter(m =>
-    m.titre.toLowerCase().includes(normalizedQuery.value)
-  );
-});
-
-const filteredMatches = computed(() => {
-  return matches.value.filter(m => 
-    m.titre.toLowerCase().includes(normalizedQuery.value)
-  );
-});
+const filteredEquipe = computed(() => equipeChannels.value.filter(filterFn));
+const filteredBein = computed(() => beinChannels.value.filter(filterFn));
+const filteredLigue1 = computed(() => ligue1Channels.value.filter(filterFn));
+const filteredMatches = computed(() => matches.value.filter(filterFn));
 
 </script>
 
@@ -234,14 +155,13 @@ const filteredMatches = computed(() => {
             <input 
               v-model="searchQuery"
               type="text" 
-              placeholder="Chercher une équipe..." 
+              placeholder="Chercher une équipe ou une chaîne..." 
               class="w-full bg-slate-900/50 border border-slate-800 py-4 pl-12 pr-4 rounded-2xl focus:border-orange-500 focus:ring-1 focus:ring-orange-500 outline-none transition-all placeholder:text-slate-700 font-medium"
             />
           </div>
           <button
             @click="loadMatches"
-            :disabled="!isEventsVisible"
-            class="p-4 bg-slate-900 border border-slate-800 rounded-2xl transition-all duration-300 active:scale-90 group disabled:cursor-not-allowed disabled:opacity-40 hover:bg-orange-600 hover:border-orange-500"
+            class="p-4 bg-slate-900 border border-slate-800 rounded-2xl transition-all duration-300 active:scale-90 hover:bg-orange-600"
           >
             <div :class="{'animate-spin': isLoading}">🔄</div>
           </button>
@@ -254,188 +174,91 @@ const filteredMatches = computed(() => {
 
       <main>
         <div class="mb-10 grid grid-cols-1 items-start gap-6 lg:grid-cols-2 xl:grid-cols-3">
-        <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-3 sm:p-4 shadow-2xl">
-          <button
-            @click="isEquipeOpen = !isEquipeOpen"
-            class="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-slate-800 via-slate-900 to-black p-4 text-left sm:p-5"
-          >
-            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black to-transparent"></div>
-
-            <div class="relative z-10 flex min-h-40 flex-col justify-between">
-              <div class="flex justify-center pt-1">
-                <img
-                  src="/lequipe-logo.svg"
-                  alt="Logo L'Equipe"
-                  class="h-14 w-auto rounded-sm border border-slate-300/20 bg-white px-4 py-1 shadow-[0_10px_26px_rgba(0,0,0,0.45)]"
-                />
+          
+          <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl">
+            <button @click="isEquipeOpen = !isEquipeOpen" class="w-full text-left group">
+              <div class="flex items-center justify-between bg-slate-800 p-4 rounded-2xl border border-slate-700 group-hover:border-red-500 transition-colors">
+                <span class="font-black uppercase tracking-widest text-red-500">L'Équipe TV</span>
+                <span class="text-xs font-bold text-slate-400">{{ isEquipeOpen ? 'FERMER' : 'OUVRIR' }}</span>
               </div>
-
-              <div class="flex items-end gap-3 text-white">
-                <div class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/30 bg-black/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6.6a9 9 0 0 1 8 0M6 9.8a13 13 0 0 1 12 0M4 13a17 17 0 0 1 16 0M12 20h.01"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-xl font-black leading-none">L'Équipe</p>
-                  <p class="text-base font-semibold leading-tight text-slate-200">{{ filteredEquipeChannels.length }} chaînes</p>
-                </div>
-                <div class="ml-auto text-sm font-bold text-slate-200">
-                  {{ isEquipeOpen ? 'Masquer' : 'Ouvrir' }}
-                </div>
-              </div>
-            </div>
-          </button>
-
-          <div v-if="isEquipeOpen" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              v-for="channel in filteredEquipeChannels"
-              :key="channel.id"
-              @click="startStreaming(channel)"
-              class="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-left text-sm font-bold text-slate-100 transition-colors hover:border-red-400/70 hover:bg-slate-900"
-            >
-              {{ channel.titre }}
             </button>
-          </div>
-        </section>
-
-
-        <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-3 sm:p-4 shadow-2xl">
-          <button
-            @click="isBeinOpen = !isBeinOpen"
-            class="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-slate-800 via-slate-900 to-black p-4 text-left sm:p-5"
-          >
-            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black to-transparent"></div>
-
-            <div class="relative z-10 flex min-h-40 flex-col justify-between">
-              <div class="flex justify-center pt-1">
-                <div
-                  class="flex h-14 w-44 items-center justify-center rounded-sm border border-slate-300/20 bg-white px-4 py-1 text-center font-black text-[#2E1A66] shadow-[0_10px_26px_rgba(0,0,0,0.45)]"
-                >
-                  beIN SPORTS
-                </div>
-              </div>
-
-              <div class="flex items-end gap-3 text-white">
-                <div class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/30 bg-black/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6.6a9 9 0 0 1 8 0M6 9.8a13 13 0 0 1 12 0M4 13a17 17 0 0 1 16 0M12 20h.01"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-xl font-black leading-none">beIN</p>
-                  <p class="text-base font-semibold leading-tight text-slate-200">{{ filteredBeinChannels.length }} chaînes</p>
-                </div>
-                <div class="ml-auto text-sm font-bold text-slate-200">
-                  {{ isBeinOpen ? 'Masquer' : 'Ouvrir' }}
-                </div>
-              </div>
+            <div v-if="isEquipeOpen" class="mt-4 grid grid-cols-1 gap-2">
+              <button v-for="ch in filteredEquipe" :key="ch.id" @click="startStreaming(ch)" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:bg-slate-800 transition-colors font-bold text-sm">
+                {{ ch.titre }}
+              </button>
             </div>
-          </button>
+          </section>
 
-          <div v-if="isBeinOpen" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              v-for="channel in filteredBeinChannels"
-              :key="channel.id"
-              @click="startStreaming(channel)"
-              class="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-left text-sm font-bold text-slate-100 transition-colors hover:border-red-400/70 hover:bg-slate-900"
-            >
-              {{ channel.titre }}
+          <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl">
+            <button @click="isBeinOpen = !isBeinOpen" class="w-full text-left group">
+              <div class="flex items-center justify-between bg-slate-800 p-4 rounded-2xl border border-slate-700 group-hover:border-purple-500 transition-colors">
+                <span class="font-black uppercase tracking-widest text-purple-400">beIN Sports</span>
+                <span class="text-xs font-bold text-slate-400">{{ isBeinOpen ? 'FERMER' : 'OUVRIR' }}</span>
+              </div>
             </button>
-          </div>
-        </section>
-
-        <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-3 sm:p-4 shadow-2xl">
-          <button
-            @click="isLigue1Open = !isLigue1Open"
-            class="relative w-full overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-slate-800 via-slate-900 to-black p-4 text-left sm:p-5"
-          >
-            <div class="pointer-events-none absolute inset-x-0 bottom-0 h-24 bg-linear-to-t from-black to-transparent"></div>
-
-            <div class="relative z-10 flex min-h-40 flex-col justify-between">
-              <div class="flex justify-center pt-1">
-                <div
-                  class="flex h-14 w-44 items-center justify-center rounded-sm border border-slate-300/20 bg-white px-4 py-1 text-center font-black text-[#064E3B] shadow-[0_10px_26px_rgba(0,0,0,0.45)]"
-                >
-                  LIGUE 1+
-                </div>
-              </div>
-
-              <div class="flex items-end gap-3 text-white">
-                <div class="inline-flex h-9 w-9 items-center justify-center rounded-md border border-white/30 bg-black/30">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M8 6.6a9 9 0 0 1 8 0M6 9.8a13 13 0 0 1 12 0M4 13a17 17 0 0 1 16 0M12 20h.01"/>
-                  </svg>
-                </div>
-                <div>
-                  <p class="text-xl font-black leading-none">Ligue 1+</p>
-                  <p class="text-base font-semibold leading-tight text-slate-200">{{ filteredLigue1Channels.length }} chaînes</p>
-                </div>
-                <div class="ml-auto text-sm font-bold text-slate-200">
-                  {{ isLigue1Open ? 'Masquer' : 'Ouvrir' }}
-                </div>
-              </div>
+            <div v-if="isBeinOpen" class="mt-4 grid grid-cols-1 gap-2">
+              <button v-for="ch in filteredBein" :key="ch.id" @click="startStreaming(ch)" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:bg-slate-800 transition-colors font-bold text-sm">
+                {{ ch.titre }}
+              </button>
             </div>
-          </button>
+          </section>
 
-          <div v-if="isLigue1Open" class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <button
-              v-for="channel in filteredLigue1Channels"
-              :key="channel.id"
-              @click="startStreaming(channel)"
-              class="rounded-2xl border border-slate-700 bg-slate-950/70 px-4 py-3 text-left text-sm font-bold text-slate-100 transition-colors hover:border-red-400/70 hover:bg-slate-900"
-            >
-              {{ channel.titre }}
+          <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl">
+            <button @click="isLigue1Open = !isLigue1Open" class="w-full text-left group">
+              <div class="flex items-center justify-between bg-slate-800 p-4 rounded-2xl border border-slate-700 group-hover:border-green-500 transition-colors">
+                <span class="font-black uppercase tracking-widest text-green-400">Ligue 1+</span>
+                <span class="text-xs font-bold text-slate-400">{{ isLigue1Open ? 'FERMER' : 'OUVRIR' }}</span>
+              </div>
             </button>
-          </div>
-        </section>
+            <div v-if="isLigue1Open" class="mt-4 grid grid-cols-1 gap-2">
+              <button v-for="ch in filteredLigue1" :key="ch.id" @click="startStreaming(ch)" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:bg-slate-800 transition-colors font-bold text-sm">
+                {{ ch.titre }}
+              </button>
+            </div>
+          </section>
         </div>
 
         <div class="mb-10 flex justify-center">
           <button
             @click="toggleEvents"
-            class="rounded-2xl border border-orange-500/40 bg-orange-500/10 px-6 py-3 text-sm font-black uppercase tracking-wide text-orange-400 transition-colors hover:bg-orange-500 hover:text-white"
+            class="rounded-2xl border border-orange-500/40 bg-orange-500/10 px-8 py-4 text-sm font-black uppercase tracking-widest text-orange-400 transition-all hover:bg-orange-500 hover:text-white"
           >
-            {{ isEventsVisible ? 'Masquer les événements' : 'Charger les événements' }}
+            {{ isEventsVisible ? 'Masquer les Directs' : 'Charger les Directs' }}
           </button>
         </div>
 
-        <div v-if="isEventsVisible && isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          <div v-for="i in 8" :key="i" class="h-64 bg-slate-900/50 rounded-[2.5rem] animate-pulse border border-slate-800"></div>
-        </div>
-
-        <div v-if="isEventsVisible && !isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
-          <div v-for="match in filteredMatches" :key="match.id" 
-               class="group relative bg-slate-900/40 border border-slate-800 rounded-[2.5rem] p-8 hover:bg-slate-900 hover:border-orange-500/40 transition-all duration-500 flex flex-col justify-between overflow-hidden shadow-2xl">
-            
-            <div class="absolute -top-24 -right-24 w-48 h-48 bg-orange-600/5 blur-[80px] group-hover:bg-orange-600/10 transition-all duration-700"></div>
-            
-            <div class="relative z-10">
-              <div class="flex justify-between items-center mb-8">
-                <div class="flex items-center gap-2">
-                  <span class="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
-                  <span class="text-[10px] font-black uppercase tracking-tighter text-red-500">Live</span>
-                </div>
-                <span class="text-[10px] text-slate-500 font-black uppercase tracking-widest bg-slate-800/50 px-3 py-1 rounded-full border border-slate-700/50">{{ match.info }}</span>
-              </div>
-              
-              <h3 class="text-2xl font-black leading-tight mb-10 group-hover:translate-x-1 transition-transform duration-300">
-                {{ match.titre }}
-              </h3>
+        <div v-if="isEventsVisible">
+            <div v-if="isLoading" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <div v-for="i in 8" :key="i" class="h-64 bg-slate-900/50 rounded-[2.5rem] animate-pulse border border-slate-800"></div>
             </div>
 
-            <button @click="startStreaming(match)" 
-                  class="relative z-10 w-full py-5 bg-slate-100 text-slate-950 font-black rounded-3xl hover:bg-orange-500 hover:text-white transition-all duration-300 transform active:scale-95 flex items-center justify-center gap-3 shadow-xl">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
-              </svg>
-              {{ match.url ? 'VOIR LE MATCH' : 'BIENTÔT DISPONIBLE' }}
-            </button>
-          </div>
-        </div>
+            <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+                <div v-for="match in filteredMatches" :key="match.id" 
+                    class="group relative bg-slate-900/40 border border-slate-800 rounded-[2.5rem] p-8 hover:bg-slate-900 hover:border-orange-500/40 transition-all duration-500 flex flex-col justify-between overflow-hidden shadow-2xl">
+                    
+                    <div class="relative z-10">
+                        <div class="flex justify-between items-center mb-6">
+                            <span class="flex items-center gap-2">
+                                <span class="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
+                                <span class="text-[10px] font-black uppercase text-red-500">Live</span>
+                            </span>
+                            <span class="text-[10px] text-slate-500 font-bold uppercase tracking-widest bg-slate-800 px-3 py-1 rounded-full">{{ match.info }}</span>
+                        </div>
+                        <h3 class="text-xl font-black leading-tight mb-8 group-hover:text-orange-500 transition-colors">
+                            {{ match.titre }}
+                        </h3>
+                    </div>
 
-        <div v-if="isEventsVisible && !isLoading && filteredMatches.length === 0 && filteredEquipeChannels.length === 0 && filteredBeinChannels.length === 0 && filteredLigue1Channels.length === 0" class="text-center py-40 border-2 border-dashed border-slate-900 rounded-[3rem]">
-          <p class="text-slate-700 text-3xl font-black italic uppercase tracking-tighter opacity-50">Aucun match trouvé</p>
+                    <button @click="startStreaming(match)" 
+                            class="relative z-10 w-full py-4 bg-slate-100 text-slate-950 font-black rounded-2xl hover:bg-orange-500 hover:text-white transition-all transform active:scale-95 shadow-xl">
+                        VOIR LE MATCH
+                    </button>
+                </div>
+            </div>
+
+            <div v-if="!isLoading && filteredMatches.length === 0" class="text-center py-20 border-2 border-dashed border-slate-900 rounded-[3rem]">
+                <p class="text-slate-700 text-xl font-black uppercase opacity-50">Aucun événement en direct trouvé</p>
+            </div>
         </div>
       </main>
 
