@@ -9,6 +9,8 @@ const PORT = process.env.PORT || 8302;
 
 app.use(cors());
 
+const backendRouter = express.Router();
+
 const BASE_URL = "https://empire-sport.art";
 const WS_URL = "wss://ws-sport.empire-socket-streaming.online:3056/_empSpo";
 
@@ -187,6 +189,12 @@ app.get('/api/get-stream-url', async (req, res) => {
         });
     }
 });
+
+app.get('/api/test', (req, res) => {
+    res.json({ message: "API fonctionne parfaitement !" });
+});
+
+app.use('/backend', backendRouter);
 
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 Serveur démarré sur le port ${PORT}`);
