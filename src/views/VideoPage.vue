@@ -14,6 +14,18 @@ const emit = defineEmits(['close']);
 
 const videoPlayer = ref<HTMLVideoElement | null>(null);
 const player = ref<any>(null);
+const isFullscreen = ref(false);
+
+const toggleFullscreen = () => {
+  if (!player.value) return;
+
+  if (player.value.isFullscreen()) {
+    player.value.exitFullscreen();
+    return;
+  }
+
+  player.value.requestFullscreen();
+};
 
 onMounted(() => {
   if (videoPlayer.value) {
@@ -44,6 +56,10 @@ onMounted(() => {
         type: 'application/x-mpegURL'
       }]
     });
+
+    player.value.on('fullscreenchange', () => {
+      isFullscreen.value = player.value?.isFullscreen?.() ?? false;
+    });
   }
 });
 
@@ -57,6 +73,13 @@ onBeforeUnmount(() => {
 
 <template>
   <div class="fixed inset-0 z-50 bg-slate-950 flex flex-col">
+    <button
+      @click="toggleFullscreen"
+      class="fixed top-4 right-4 z-70 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-slate-950 text-sm font-bold shadow-lg shadow-black/40 transition-colors"
+    >
+      {{ isFullscreen ? 'Quitter plein écran' : 'Plein écran' }}
+    </button>
+
     <div class="p-4 flex justify-between items-center bg-slate-900 border-b border-slate-800">
       <div class="flex items-center gap-4">
         <button @click="emit('close')" class="p-2 hover:bg-slate-800 rounded-full transition-colors">
@@ -69,7 +92,7 @@ onBeforeUnmount(() => {
       <span class="px-3 py-1 bg-red-600 animate-pulse rounded text-xs font-bold uppercase">En Direct</span>
     </div>
 
-    <div class="flex-grow flex items-center justify-center bg-black">
+    <div class="grow flex items-center justify-center bg-black">
       <div class="w-full max-w-6xl shadow-2xl shadow-orange-900/20">
         <div data-vjs-player>
           <video ref="videoPlayer" class="video-js vjs-theme-city [image-rendering:auto] shadow-[0_0_50px_rgba(0,0,0,0.5)]"></video>

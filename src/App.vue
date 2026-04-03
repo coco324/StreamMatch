@@ -11,7 +11,7 @@ interface Match {
 }
 
 // --- CONFIGURATION ---
-const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8300';
+const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8302'; // URL du backend Node.js
 
 // URLs des pages "Répertoires" d'Empire
 const EQUIPE_PAGE_URL = "https://empire-sport.art/chaine/l-equipe-en-streaming"; 
@@ -265,3 +265,4 @@ const filteredMatches = computed(() => matches.value.filter(filterFn));
     </div>
   </div>
 </template>
+

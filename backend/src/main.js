@@ -6,8 +6,11 @@ import * as cheerio from 'cheerio';
 
 const app = express();
 const PORT = process.env.PORT || 8302;
+const HOST = process.env.PORT ? '185.31.41.79' : 'localhost';
 
 app.use(cors());
+
+const backendRouter = express.Router();
 
 const BASE_URL = "https://empire-sport.art";
 const WS_URL = "wss://ws-sport.empire-socket-streaming.online:3056/_empSpo";
@@ -188,6 +191,13 @@ app.get('/api/get-stream-url', async (req, res) => {
     }
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 Serveur démarré sur le port ${PORT}`);
+app.get('/api/test', (req, res) => {
+    res.json({ message: "API fonctionne parfaitement !" });
+});
+
+app.use('/backend', backendRouter);
+
+app.listen(PORT, HOST, () => {
+    console.log(`🚀 Serveur démarré !`);
+    console.log(`🌍 Adresse : http://${HOST}:${PORT}`);
 });
