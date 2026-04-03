@@ -197,6 +197,6 @@ app.get('/api/test', (req, res) => {
 
 app.use('/backend', backendRouter);
 
-app.listen(PORT, IP, () => {
+app.listen(PORT, "0.0.0.0", () => {
     console.log(`🚀 Serveur Node lancé sur ${IP}:${PORT}`);
 });
