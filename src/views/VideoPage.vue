@@ -3,49 +3,61 @@ import { ref, onMounted, onBeforeUnmount } from 'vue';
 import videojs from 'video.js';
 import 'video.js/dist/video-js.css';
 
-// Définition des props (ce que le parent envoie)
 const props = defineProps<{
   matchTitle: string;
-  streamUrl: string; // Le lien m3u8 final envoyé par le backend
+  streamUrl: string; 
 }>();
 
-// Définition des événements (ce qu'on renvoie au parent)
 const emit = defineEmits(['close']);
 
 const videoPlayer = ref<HTMLVideoElement | null>(null);
 const player = ref<any>(null);
 const isFullscreen = ref(false);
+const keepAliveInterval = ref<any>(null);
+
+// Configuration URL Backend pour le ping
+const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8302';
 
 const toggleFullscreen = () => {
   if (!player.value) return;
-
   if (player.value.isFullscreen()) {
     player.value.exitFullscreen();
-    return;
+  } else {
+    player.value.requestFullscreen();
   }
+};
 
-  player.value.requestFullscreen();
+// --- LA SEULE AJOUT : LE TIMER ---
+const startKeepAlive = () => {
+  const FIFTEEN_MINUTES = 900000;
+  keepAliveInterval.value = setInterval(async () => {
+    try {
+      // On envoie une requête discrète pour garder la session active
+      await fetch(`${backendUrl}/api/keep-alive?url=${encodeURIComponent(props.streamUrl)}`);
+      console.log("🔄 Session rafraîchie (15 min)");
+    } catch (e) {
+      console.log("⚠️ Erreur refresh session");
+    }
+  }, FIFTEEN_MINUTES);
 };
 
 onMounted(() => {
   if (videoPlayer.value) {
-    // Initialisation de Video.js avec optimisation du cache (Buffer)
     player.value = videojs(videoPlayer.value, {
       autoplay: true,
       controls: true,
       responsive: true,
       fluid: true,
       playbackRates: [0.5, 1, 1.5, 2],
-      userActions: {
-        hotkeys: true // Barre d'espace, flèches, etc.
-      },
+      userActions: { hotkeys: true },
       html5: {
         vhs: {
-          overrideNative: true, // Force Video.js à gérer le HLS même sur Safari/Mobile
-          maxBufferLength: 60,  // Stocke 60s de vidéo en avance
-          maxMaxBufferLength: 120, // Peut monter jusqu'à 2 min de cache
-          enableLowInitialPlaylist: true, // Charge plus vite au début
-          limitRenditionByPlayerDimensions: false, // Garde la meilleure qualité possible
+          overrideNative: true,
+          // --- ON REMET TES RÉGLAGES PERF EXACTS ---
+          maxBufferLength: 60,
+          maxMaxBufferLength: 120,
+          enableLowInitialPlaylist: true,
+          limitRenditionByPlayerDimensions: false,
           smoothQualityChange: true,
           fastQualityChange: true,
           useNetworkInformationApi: false,
@@ -58,13 +70,18 @@ onMounted(() => {
     });
 
     player.value.on('fullscreenchange', () => {
-      isFullscreen.value = player.value?.isFullscreen?.() ?? false;
+      isFullscreen.value = !!player.value.isFullscreen();
     });
+
+    // Lancement du timer de 15 minutes
+    startKeepAlive();
   }
 });
 
-// Nettoyage de la mémoire quand on ferme la page
 onBeforeUnmount(() => {
+  // On nettoie le timer quand on quitte
+  if (keepAliveInterval.value) clearInterval(keepAliveInterval.value);
+  
   if (player.value) {
     player.value.dispose();
   }
@@ -75,7 +92,7 @@ onBeforeUnmount(() => {
   <div class="fixed inset-0 z-50 bg-slate-950 flex flex-col">
     <button
       @click="toggleFullscreen"
-      class="fixed top-4 right-4 z-70 px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-slate-950 text-sm font-bold shadow-lg shadow-black/40 transition-colors"
+      class="fixed top-4 right-4 z-[200] px-4 py-2 rounded-lg bg-orange-500 hover:bg-orange-400 text-slate-950 text-sm font-bold shadow-lg transition-colors"
     >
       {{ isFullscreen ? 'Quitter plein écran' : 'Plein écran' }}
     </button>
@@ -95,24 +112,26 @@ onBeforeUnmount(() => {
     <div class="grow flex items-center justify-center bg-black">
       <div class="w-full max-w-6xl shadow-2xl shadow-orange-900/20">
         <div data-vjs-player>
-          <video ref="videoPlayer" class="video-js vjs-theme-city [image-rendering:auto] shadow-[0_0_50px_rgba(0,0,0,0.5)]"></video>
+          <video 
+            ref="videoPlayer" 
+            class="video-js vjs-theme-city [image-rendering:auto] shadow-[0_0_50px_rgba(0,0,0,0.5)]"
+          ></video>
         </div>
       </div>
     </div>
 
-    <div class="p-6 bg-slate-900 text-slate-400 text-sm text-center">
-      ⚠️ Si la vidéo coupe, revenez en arrière et relancez le flux. Session de 20 min active.
+    <div class="p-6 bg-slate-900 text-slate-400 text-sm text-center italic border-t border-slate-800">
+      Maintien de session automatique toutes les 15 minutes.
     </div>
   </div>
 </template>
 
 <style>
-/* Personnalisation du lecteur pour qu'il soit plus moderne */
 .video-js {
   font-family: 'Inter', sans-serif;
 }
 .vjs-big-play-button {
-  background-color: rgba(249, 115, 22, 0.8) !important; /* Orange-500 */
+  background-color: rgba(249, 115, 22, 0.8) !important;
   border: none !important;
   border-radius: 50% !important;
   width: 80px !important;
