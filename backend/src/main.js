@@ -43,6 +43,14 @@ function buildProxyUrl(req, targetUrl, referer, origin) {
     return `${base}/api/proxy-hls?${params.toString()}`;
 }
 
+function toAbsoluteUrl(candidate, sourceUrl) {
+    try {
+        return new URL(candidate, sourceUrl).href;
+    } catch {
+        return null;
+    }
+}
+
 async function fetchWithPlayerHeaders(targetUrl, referer, origin, responseType = 'text') {
     const headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -63,14 +71,28 @@ function rewriteM3u8Content(content, sourceUrl, req, referer, origin) {
     const lines = content.split(/\r?\n/);
     let rewrittenCount = 0;
 
+    const rewriteUriAttributes = (line) => {
+        if (!line.includes('URI="')) return line;
+
+        return line.replace(/URI="([^"]+)"/g, (_, rawUri) => {
+            const absolute = toAbsoluteUrl(rawUri, sourceUrl);
+            if (!absolute) return `URI="${rawUri}"`;
+            rewrittenCount += 1;
+            return `URI="${buildProxyUrl(req, absolute, referer, origin)}"`;
+        });
+    };
+
     const rewritten = lines.map((line) => {
         const trimmed = line.trim();
-        if (!trimmed || trimmed.startsWith('#')) return line;
+        if (!trimmed) return line;
 
-        let absoluteUrl;
-        try {
-            absoluteUrl = new URL(trimmed, sourceUrl).href;
-        } catch {
+        // Rewrite URI attributes used by keys/maps/media declarations.
+        if (trimmed.startsWith('#')) {
+            return rewriteUriAttributes(line);
+        }
+
+        const absoluteUrl = toAbsoluteUrl(trimmed, sourceUrl);
+        if (!absoluteUrl) {
             return line;
         }
 
@@ -327,7 +349,7 @@ app.get('/api/proxy-hls', async (req, res) => {
     }
 
     try {
-        const targetUrl = decodeURIComponent(url);
+        const targetUrl = url;
         const safeReferer = typeof referer === 'string' ? referer : undefined;
         const safeOrigin = typeof origin === 'string' ? origin : undefined;
 
@@ -376,8 +398,11 @@ app.get('/api/proxy-hls', async (req, res) => {
         res.setHeader('Content-Type', contentType || 'application/octet-stream');
         return res.status(200).send(Buffer.from(upstream.data));
     } catch (error) {
+        const status = error?.response?.status;
+        const statusText = error?.response?.statusText;
+        const upstreamContentType = error?.response?.headers?.['content-type'];
         console.error('❌ Erreur proxy HLS :', error.message);
-        logTest('proxy-error', { message: error.message });
+        logTest('proxy-error', { message: error.message, status, statusText, upstreamContentType });
         return res.status(500).json({
             success: false,
             message: "Impossible de charger le flux via proxy"
