@@ -8,6 +8,9 @@ const app = express();
 const PORT = process.env.PORT || 8302;
 const HOST = process.env.PORT ? '185.31.41.79' : 'localhost';
 
+// Needed behind reverse proxies (Alwaysdata) to infer external protocol/host.
+app.set('trust proxy', true);
+
 app.use(cors());
 
 const backendRouter = express.Router();
@@ -36,10 +39,15 @@ function extractM3u8FromHtml(html) {
 }
 
 function buildProxyUrl(req, targetUrl, referer, origin) {
+    const forwardedProto = (req.get('x-forwarded-proto') || '').split(',')[0].trim();
+    const forwardedHost = (req.get('x-forwarded-host') || '').split(',')[0].trim();
+    const protocol = forwardedProto || req.protocol;
+    const host = forwardedHost || req.get('host');
+
     const params = new URLSearchParams({ url: targetUrl });
     if (referer) params.append('referer', referer);
     if (origin) params.append('origin', origin);
-    return `/api/proxy-hls?${params.toString()}`;
+    return `${protocol}://${host}/api/proxy-hls?${params.toString()}`;
 }
 
 function toAbsoluteUrl(candidate, sourceUrl) {
