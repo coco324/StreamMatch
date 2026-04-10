@@ -36,11 +36,10 @@ function extractM3u8FromHtml(html) {
 }
 
 function buildProxyUrl(req, targetUrl, referer, origin) {
-    const base = `${req.protocol}://${req.get('host')}`;
     const params = new URLSearchParams({ url: targetUrl });
     if (referer) params.append('referer', referer);
     if (origin) params.append('origin', origin);
-    return `${base}/api/proxy-hls?${params.toString()}`;
+    return `/api/proxy-hls?${params.toString()}`;
 }
 
 function toAbsoluteUrl(candidate, sourceUrl) {
