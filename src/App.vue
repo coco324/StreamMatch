@@ -11,12 +11,14 @@ interface Match {
 }
 
 // --- CONFIGURATION ---
-const backendUrl = import.meta.env.VITE_SERVER_URL ?? 'http://localhost:8302'; // URL du backend Node.js
+const backendUrl = (import.meta.env.VITE_SERVER_URL || 'http://localhost:8302').replace(/\/$/, ''); // URL du backend Node.js
 
 // URLs des pages "Répertoires" d'Empire
-const EQUIPE_PAGE_URL = "https://empire-sport.art/chaine/l-equipe-en-streaming"; 
-const BEIN_PAGE_URL = "https://empire-sport.art/chaine/bein-sports-en-streaming"; 
-const LIGUE1_PAGE_URL = "https://empire-sport.art/chaine/ligue1-en-streaming";
+const EQUIPE_PAGE_URL = "https://empire-sport.sbs/chaine/l-equipe-en-streaming"; 
+const BEIN_PAGE_URL = "https://empire-sport.sbs/chaine/bein-sports-en-streaming"; 
+const LIGUE1_PAGE_URL = "https://empire-sport.sbs/chaine/ligue1-en-streaming";
+const TEST_WITV_REFERER = "https://witv.team/";
+const TEST_WITV_ORIGIN = "https://witv.team";
 
 // --- ÉTATS (STATES) ---
 const matches = ref<Match[]>([]);
@@ -28,6 +30,8 @@ const statusMsg = ref("");
 const isEquipeOpen = ref(false);
 const isBeinOpen = ref(false);
 const isLigue1Open = ref(false);
+const isTestBeinOpen = ref(false);
+const isTestLigue1Open = ref(false);
 const isEventsVisible = ref(false);
 
 // État du lecteur vidéo
@@ -52,6 +56,16 @@ const ligue1Channels = ref<Match[]>([
   { id: 'ch-l1-1', titre: "Ligue 1+", url: LIGUE1_PAGE_URL, info: "Répertoire Ligue 1+" },
   { id: 'ch-l1-2', titre: "Ligue 1+ 2", url: LIGUE1_PAGE_URL, info: "Répertoire Ligue 1+" },
   { id: 'ch-l1-3', titre: "Ligue 1+ 3", url: LIGUE1_PAGE_URL, info: "Répertoire Ligue 1+" }
+]);
+
+const testBeinChannels = ref<Match[]>([
+  { id: 'ch-test-bein-1', titre: "Test beIN 1", url: "https://cluone.dad/live/388FAA8743C4E2980F7B4089B7E81087/4.m3u8", info: "Test beIN" },
+  { id: 'ch-test-bein-2', titre: "Test beIN 2", url: "https://cluone.dad/live/388FAA8743C4E2980F7B4089B7E81087/5.m3u8", info: "Test beIN" },
+  { id: 'ch-test-bein-3', titre: "Test beIN 3", url: "https://cluone.dad/live/388FAA8743C4E2980F7B4089B7E81087/6.m3u8", info: "Test beIN" }
+]);
+
+const testLigue1Channels = ref<Match[]>([
+  { id: 'ch-test-ligue1-1', titre: "Test Ligue 1+", url: "https://cluone.dad/live/388FAA8743C4E2980F7B4089B7E81087/22.m3u8", info: "Test Ligue 1+" }
 ]);
 
 // --- LOGIQUE API ---
@@ -112,6 +126,26 @@ const startStreaming = async (match: Match) => {
   }
 };
 
+const startTestBeinStream = async (channel: Match) => {
+  statusMsg.value = `⏳ Préparation du flux ${channel.titre}...`;
+
+  try {
+    const proxyParams = new URLSearchParams({
+      url: channel.url,
+      referer: TEST_WITV_REFERER,
+      origin: TEST_WITV_ORIGIN
+    });
+    const proxiedM3u8 = `${backendUrl}/api/proxy-hls?${proxyParams.toString()}`;
+
+    selectedMatch.value = channel;
+    currentStreamUrl.value = proxiedM3u8;
+    isStreaming.value = true;
+    statusMsg.value = "";
+  } catch (e: any) {
+    statusMsg.value = `❌ Test impossible : ${e?.message ?? "Erreur inconnue"}`;
+  }
+};
+
 // --- FILTRAGE ---
 const normalizedQuery = computed(() => searchQuery.value.toLowerCase());
 const filterFn = (m: Match) => m.titre.toLowerCase().includes(normalizedQuery.value);
@@ -119,6 +153,8 @@ const filterFn = (m: Match) => m.titre.toLowerCase().includes(normalizedQuery.va
 const filteredEquipe = computed(() => equipeChannels.value.filter(filterFn));
 const filteredBein = computed(() => beinChannels.value.filter(filterFn));
 const filteredLigue1 = computed(() => ligue1Channels.value.filter(filterFn));
+const filteredTestBein = computed(() => testBeinChannels.value.filter(filterFn));
+const filteredTestLigue1 = computed(() => testLigue1Channels.value.filter(filterFn));
 const filteredMatches = computed(() => matches.value.filter(filterFn));
 
 </script>
@@ -212,6 +248,34 @@ const filteredMatches = computed(() => matches.value.filter(filterFn));
             </button>
             <div v-if="isLigue1Open" class="mt-4 grid grid-cols-1 gap-2">
               <button v-for="ch in filteredLigue1" :key="ch.id" @click="startStreaming(ch)" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:bg-slate-800 transition-colors font-bold text-sm">
+                {{ ch.titre }}
+              </button>
+            </div>
+          </section>
+
+          <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl">
+            <button @click="isTestBeinOpen = !isTestBeinOpen" class="w-full text-left group">
+              <div class="flex items-center justify-between bg-slate-800 p-4 rounded-2xl border border-slate-700 group-hover:border-orange-500 transition-colors">
+                <span class="font-black uppercase tracking-widest text-orange-400">Test beIN</span>
+                <span class="text-xs font-bold text-slate-400">{{ isTestBeinOpen ? 'FERMER' : 'OUVRIR' }}</span>
+              </div>
+            </button>
+            <div v-if="isTestBeinOpen" class="mt-4 grid grid-cols-1 gap-2">
+              <button v-for="ch in filteredTestBein" :key="ch.id" @click="startTestBeinStream(ch)" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:bg-slate-800 transition-colors font-bold text-sm">
+                {{ ch.titre }}
+              </button>
+            </div>
+          </section>
+
+          <section class="self-start rounded-3xl border border-white/10 bg-slate-900/70 p-4 shadow-2xl">
+            <button @click="isTestLigue1Open = !isTestLigue1Open" class="w-full text-left group">
+              <div class="flex items-center justify-between bg-slate-800 p-4 rounded-2xl border border-slate-700 group-hover:border-cyan-500 transition-colors">
+                <span class="font-black uppercase tracking-widest text-cyan-400">Test Ligue 1+</span>
+                <span class="text-xs font-bold text-slate-400">{{ isTestLigue1Open ? 'FERMER' : 'OUVRIR' }}</span>
+              </div>
+            </button>
+            <div v-if="isTestLigue1Open" class="mt-4 grid grid-cols-1 gap-2">
+              <button v-for="ch in filteredTestLigue1" :key="ch.id" @click="startTestBeinStream(ch)" class="p-3 bg-slate-950 border border-slate-800 rounded-xl text-left hover:bg-slate-800 transition-colors font-bold text-sm">
                 {{ ch.titre }}
               </button>
             </div>
