@@ -3,6 +3,8 @@ import axios from 'axios';
 import { io } from "socket.io-client";
 import cors from 'cors';
 import * as cheerio from 'cheerio';
+import http from 'http';
+import https from 'https';
 
 const app = express();
 const PORT = process.env.PORT || 8302;
@@ -17,6 +19,8 @@ const backendRouter = express.Router();
 
 const BASE_URL = "https://empire-sport.sbs";
 const WS_URL = "wss://ws-sport.empire-socket-streaming.online:3056/_empSpo";
+const KEEP_ALIVE_HTTP_AGENT = new http.Agent({ keepAlive: true, maxSockets: 100 });
+const KEEP_ALIVE_HTTPS_AGENT = new https.Agent({ keepAlive: true, maxSockets: 100 });
 
 function logTest(step, details = {}) {
     const timestamp = new Date().toISOString();
@@ -54,7 +58,7 @@ function toAbsoluteUrl(candidate, sourceUrl) {
     }
 }
 
-async function fetchWithPlayerHeaders(targetUrl, referer, origin, responseType = 'text') {
+async function fetchWithPlayerHeaders(targetUrl, referer, origin, responseType = 'text', rangeHeader = undefined) {
     const headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "*/*"
@@ -62,11 +66,14 @@ async function fetchWithPlayerHeaders(targetUrl, referer, origin, responseType =
 
     if (referer) headers["Referer"] = referer;
     if (origin) headers["Origin"] = origin;
+    if (rangeHeader) headers["Range"] = rangeHeader;
 
     return axios.get(targetUrl, {
         headers,
         responseType,
-        timeout: 15000
+        timeout: 20000,
+        httpAgent: KEEP_ALIVE_HTTP_AGENT,
+        httpsAgent: KEEP_ALIVE_HTTPS_AGENT
     });
 }
 
@@ -335,10 +342,12 @@ app.get('/api/extract-m3u8', async (req, res) => {
 
 app.get('/api/proxy-hls', async (req, res) => {
     const { url, referer, origin } = req.query;
+    const rangeHeader = req.get('range');
     logTest('proxy-request', {
         url,
         referer,
         origin,
+        range: rangeHeader || null,
         ip: req.ip,
         userAgent: req.get('user-agent') || 'unknown'
     });
@@ -362,7 +371,8 @@ app.get('/api/proxy-hls', async (req, res) => {
             targetUrl,
             safeReferer,
             safeOrigin,
-            isM3u8 ? 'text' : 'arraybuffer'
+            isM3u8 ? 'text' : 'arraybuffer',
+            rangeHeader
         );
 
         const contentType = upstream.headers['content-type'] || '';
@@ -397,12 +407,21 @@ app.get('/api/proxy-hls', async (req, res) => {
             });
 
             res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-            return res.status(200).send(rewriteResult.content);
+            return res.status(upstream.status || 200).send(rewriteResult.content);
         }
 
         logTest('proxy-binary-forward', { targetUrl, contentType, payloadSize });
         res.setHeader('Content-Type', contentType || 'application/octet-stream');
-        return res.status(200).send(Buffer.from(upstream.data));
+        if (upstream.headers['content-length']) {
+            res.setHeader('Content-Length', upstream.headers['content-length']);
+        }
+        if (upstream.headers['content-range']) {
+            res.setHeader('Content-Range', upstream.headers['content-range']);
+        }
+        if (upstream.headers['accept-ranges']) {
+            res.setHeader('Accept-Ranges', upstream.headers['accept-ranges']);
+        }
+        return res.status(upstream.status || 200).send(Buffer.from(upstream.data));
     } catch (error) {
         const status = error?.response?.status;
         const statusText = error?.response?.statusText;
