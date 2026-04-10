@@ -191,6 +191,15 @@ app.get('/api/get-stream-url', async (req, res) => {
     }
 });
 
+// Route de maintien de session (Keep-Alive)
+app.get('/api/keep-alive', (req, res) => {
+  const streamUrl = req.query.url;
+  console.log(`📡 Session maintenue pour : ${streamUrl}`);
+  
+  // Ici, on renvoie juste un OK pour dire au serveur de ne pas fermer
+  res.status(200).json({ status: "alive" });
+});
+
 app.get('/api/test', (req, res) => {
     res.json({ message: "API fonctionne parfaitement !" });
 });
