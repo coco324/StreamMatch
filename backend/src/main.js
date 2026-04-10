@@ -15,6 +15,11 @@ const backendRouter = express.Router();
 const BASE_URL = "https://empire-sport.sbs";
 const WS_URL = "wss://ws-sport.empire-socket-streaming.online:3056/_empSpo";
 
+function logTest(step, details = {}) {
+    const timestamp = new Date().toISOString();
+    console.log(`[TEST][${timestamp}][${step}]`, details);
+}
+
 function extractM3u8FromHtml(html) {
     if (!html || typeof html !== 'string') return null;
 
@@ -56,6 +61,8 @@ async function fetchWithPlayerHeaders(targetUrl, referer, origin, responseType =
 
 function rewriteM3u8Content(content, sourceUrl, req, referer, origin) {
     const lines = content.split(/\r?\n/);
+    let rewrittenCount = 0;
+
     const rewritten = lines.map((line) => {
         const trimmed = line.trim();
         if (!trimmed || trimmed.startsWith('#')) return line;
@@ -67,10 +74,15 @@ function rewriteM3u8Content(content, sourceUrl, req, referer, origin) {
             return line;
         }
 
+        rewrittenCount += 1;
         return buildProxyUrl(req, absoluteUrl, referer, origin);
     });
 
-    return rewritten.join('\n');
+    return {
+        content: rewritten.join('\n'),
+        rewrittenCount,
+        totalLines: lines.length
+    };
 }
 
 
@@ -251,8 +263,10 @@ app.get('/api/get-stream-url', async (req, res) => {
 
 app.get('/api/extract-m3u8', async (req, res) => {
     const { url } = req.query;
+    logTest('extract-request', { url });
 
     if (!url || typeof url !== 'string') {
+        logTest('extract-invalid-url', { urlType: typeof url });
         return res.status(400).json({
             success: false,
             message: "Paramètre 'url' manquant ou invalide"
@@ -267,17 +281,26 @@ app.get('/api/extract-m3u8', async (req, res) => {
             }
         });
 
+        logTest('extract-upstream-response', {
+            status: response.status,
+            contentType: response.headers?.['content-type'] || 'unknown',
+            htmlLength: typeof response.data === 'string' ? response.data.length : -1
+        });
+
         const m3u8 = extractM3u8FromHtml(response.data);
         if (!m3u8) {
+            logTest('extract-not-found', { url });
             return res.status(404).json({
                 success: false,
                 message: "Aucun lien M3U8 trouvé sur la page cible"
             });
         }
 
+        logTest('extract-success', { m3u8 });
         res.json({ m3u8 });
     } catch (error) {
         console.error("❌ Erreur extraction M3U8 :", error.message);
+        logTest('extract-error', { message: error.message });
         res.status(500).json({
             success: false,
             message: "Impossible d'extraire le lien M3U8"
@@ -287,8 +310,16 @@ app.get('/api/extract-m3u8', async (req, res) => {
 
 app.get('/api/proxy-hls', async (req, res) => {
     const { url, referer, origin } = req.query;
+    logTest('proxy-request', {
+        url,
+        referer,
+        origin,
+        ip: req.ip,
+        userAgent: req.get('user-agent') || 'unknown'
+    });
 
     if (!url || typeof url !== 'string') {
+        logTest('proxy-invalid-url', { urlType: typeof url });
         return res.status(400).json({
             success: false,
             message: "Paramètre 'url' manquant ou invalide"
@@ -301,6 +332,7 @@ app.get('/api/proxy-hls', async (req, res) => {
         const safeOrigin = typeof origin === 'string' ? origin : undefined;
 
         const isM3u8 = targetUrl.toLowerCase().includes('.m3u8');
+        logTest('proxy-upstream-start', { targetUrl, isM3u8, safeReferer, safeOrigin });
         const upstream = await fetchWithPlayerHeaders(
             targetUrl,
             safeReferer,
@@ -310,6 +342,16 @@ app.get('/api/proxy-hls', async (req, res) => {
 
         const contentType = upstream.headers['content-type'] || '';
         const looksLikePlaylist = isM3u8 || contentType.includes('mpegurl');
+        const payloadSize = typeof upstream.data === 'string'
+            ? upstream.data.length
+            : (upstream.data?.byteLength || 0);
+
+        logTest('proxy-upstream-response', {
+            status: upstream.status,
+            contentType,
+            looksLikePlaylist,
+            payloadSize
+        });
 
         res.setHeader('Access-Control-Allow-Origin', '*');
         res.setHeader('Cache-Control', 'no-store');
@@ -319,15 +361,23 @@ app.get('/api/proxy-hls', async (req, res) => {
                 ? upstream.data
                 : Buffer.from(upstream.data).toString('utf-8');
 
-            const rewritten = rewriteM3u8Content(playlistText, targetUrl, req, safeReferer, safeOrigin);
+            const rewriteResult = rewriteM3u8Content(playlistText, targetUrl, req, safeReferer, safeOrigin);
+            logTest('proxy-playlist-rewritten', {
+                targetUrl,
+                rewrittenCount: rewriteResult.rewrittenCount,
+                totalLines: rewriteResult.totalLines
+            });
+
             res.setHeader('Content-Type', 'application/vnd.apple.mpegurl');
-            return res.status(200).send(rewritten);
+            return res.status(200).send(rewriteResult.content);
         }
 
+        logTest('proxy-binary-forward', { targetUrl, contentType, payloadSize });
         res.setHeader('Content-Type', contentType || 'application/octet-stream');
         return res.status(200).send(Buffer.from(upstream.data));
     } catch (error) {
         console.error('❌ Erreur proxy HLS :', error.message);
+        logTest('proxy-error', { message: error.message });
         return res.status(500).json({
             success: false,
             message: "Impossible de charger le flux via proxy"
