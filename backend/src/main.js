@@ -17,7 +17,7 @@ app.use(cors());
 
 const backendRouter = express.Router();
 
-const BASE_URL = "https://empire-sport.store";
+const BASE_URL = "https://empire-sports.store";
 const WS_URL = "wss://ws-sport.empire-socket-streaming.online:3056/_empSpo";
 const KEEP_ALIVE_HTTP_AGENT = new http.Agent({ keepAlive: true, maxSockets: 100 });
 const KEEP_ALIVE_HTTPS_AGENT = new https.Agent({ keepAlive: true, maxSockets: 100 });
