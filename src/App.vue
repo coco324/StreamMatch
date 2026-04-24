@@ -14,9 +14,9 @@ interface Match {
 const backendUrl = (import.meta.env.VITE_SERVER_URL || 'http://localhost:8302').replace(/\/$/, ''); // URL du backend Node.js
 
 // URLs des pages "Répertoires" d'Empire
-const EQUIPE_PAGE_URL = "https://empire-sport.sbs/chaine/l-equipe-en-streaming"; 
-const BEIN_PAGE_URL = "https://empire-sport.sbs/chaine/bein-sports-en-streaming"; 
-const LIGUE1_PAGE_URL = "https://empire-sport.sbs/chaine/ligue1-en-streaming";
+const EQUIPE_PAGE_URL = "https://empire-sport.store/chaine/l-equipe-en-streaming"; 
+const BEIN_PAGE_URL = "https://empire-sport.store/chaine/bein-sports-en-streaming"; 
+const LIGUE1_PAGE_URL = "https://empire-sport.store/chaine/ligue1-en-streaming";
 const TEST_WITV_REFERER = "https://witv.team/";
 const TEST_WITV_ORIGIN = "https://witv.team";
 
